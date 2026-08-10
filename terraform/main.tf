@@ -5,6 +5,10 @@ terraform {
             source = "hashicorp/azurerm"
             version = "~> 3.90"
         }
+        http = {
+            source  = "hashicorp/http"
+            version = "~> 3.4"
+        }
     }
 }
 
@@ -39,6 +43,10 @@ resource "azurerm_subnet" "subnet" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
+data "http" "my_ip" {
+  url = "https://api.ipify.org"
+}
+
 # Network Security Group (NSG)
 
 resource "azurerm_network_security_group" "nsg" {
@@ -54,7 +62,7 @@ resource "azurerm_network_security_group" "nsg" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "22"
-    source_address_prefix      = var.my_ip
+    source_address_prefix      = "${data.http.my_ip.response_body}/32"
     destination_address_prefix = "*"
   }
 }

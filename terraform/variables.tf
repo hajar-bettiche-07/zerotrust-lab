@@ -1,5 +1,5 @@
 variable "my_ip" {
-  description = "41.249.82.253/32"
+  description = "41.248.120.186/32"
   type        = string
 }
 
