@@ -22,7 +22,7 @@ provider "azurerm" {
 
 resource "azurerm_resource_group" "rg" {
   name     = "rg-zerotrust-lab"
-  location = "westeurope"
+  location = "spaincentral"
 }
 
 # deuxième ressource : azurerm_virtual_network
