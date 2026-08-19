@@ -5,10 +5,6 @@ terraform {
             source = "hashicorp/azurerm"
             version = "~> 3.90"
         }
-        http = {
-            source  = "hashicorp/http"
-            version = "~> 3.4"
-        }
     }
 }
 
@@ -43,9 +39,6 @@ resource "azurerm_subnet" "subnet" {
   address_prefixes     = ["10.0.1.0/24"]
 }
 
-data "http" "my_ip" {
-  url = "https://api.ipify.org"
-}
 
 # Network Security Group (NSG)
 
