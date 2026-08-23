@@ -2,7 +2,7 @@
 
 Infrastructure Cloud Azure provisionnée en Terraform, sécurisée progressivement avec WireGuard VPN, UFW et Fail2Ban. : aucun accès SSH direct depuis Internet, uniquement via un tunnel VPN chiffré .
 
-Projet réalisé seule, en combinant délibérément quatre axes : **Cloud** (Azure), **DevOps** (Terraform),**Network** (SSH, WireGuard , routage) et **Security** (UFW, Fail2Ban, hardening,Zero Trust).
+Projet réalisé en combinant délibérément quatre axes : **Cloud** (Azure), **DevOps** (Terraform),**Network** (SSH, WireGuard , routage) et **Security** (UFW, Fail2Ban, hardening,Zero Trust).
 
 ---
 
