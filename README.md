@@ -1,8 +1,8 @@
 # Cloud Zero Trust Secure Access Lab
 
-Infrastructure Cloud Azure provisionnée en Infrastructure as Code (Terraform), sécurisée progressivement jusqu'à un modèle **Zero Trust** : aucun accès SSH direct depuis Internet, uniquement via un tunnel VPN chiffré (WireGuard).
+Zero Trust Network Access (ZTNA) Lab — Infrastructure Cloud Azure provisionnée en Terraform, sécurisée progressivement avec WireGuard VPN, UFW et Fail2Ban. : aucun accès SSH direct depuis Internet, uniquement via un tunnel VPN chiffré .
 
-Projet réalisé seule, en combinant délibérément quatre axes : **Cloud** (Azure), **DevOps** (Terraform), **Network** (SSH, WireGuard, routage) et **Security** (UFW, Fail2Ban, hardening, Zero Trust).
+Projet réalisé seule, en combinant délibérément quatre axes : **Cloud** (Azure), **DevOps** (Terraform),**Network** (SSH, WireGuard , routage) et **Security** (UFW, Fail2Ban, hardening,Zero Trust).
 
 ---
 
@@ -23,7 +23,7 @@ Projet réalisé seule, en combinant délibérément quatre axes : **Cloud** (Az
 
 ## 1. Objectif du projet
 
-Construire une VM Linux sur Azure et la sécuriser étape par étape, jusqu'à ce que l'accès distant ne soit possible **que** via un VPN chiffré — jamais en direct. Au-delà de l'aspect technique, l'objectif était de produire un portfolio cohérent avec un profil Network + Cloud + DevOps + Security, en vue de la certification AZ-104 et d'entretiens techniques.
+Construire une VM Linux sur Azure et la sécuriser étape par étape, jusqu'à ce que l'accès distant ne soit possible **que** via un VPN chiffré — jamais en direct. Le projet combine délibérément quatre axes complémentaires : Cloud, DevOps, Network et Security.
 
 ## 2. Choix retenus et justificatifs
 
@@ -34,9 +34,9 @@ Construire une VM Linux sur Azure et la sécuriser étape par étape, jusqu'à c
 | Taille VM | `Standard_B1s` | Éligible aux offres légères Azure, suffisant pour ce lab, limite la consommation du crédit étudiant |
 | VPN | WireGuard | Léger, moderne, rapide à configurer, bon niveau pédagogique sur le chiffrement et le tunneling |
 | Modèle de sécurité | Zero Trust (verify, least privilege, reduce attack surface, assume breach) | Ajoute une vraie dimension architecture sécurité au lab, au-delà de l'installation d'outils isolés |
-| Gestion du crédit Azure | `deallocate` systématique de la VM après chaque session | Compte étudiant à crédit limité (100$, 54 jours) ; une VM allumée en continu consomme le crédit même sans usage actif |
+| Gestion du crédit Azure | `deallocate` systématique de la VM après chaque session | Compte étudiant à crédit limité ; une VM allumée en continu consomme le crédit même sans usage actif |
 
-En résumé : Terraform apporte la dimension DevOps sans surcharger le planning avec un second outil, tandis que la configuration de la VM reste manuelle pour garder le contrôle et bien comprendre chaque commande — un point important pour une soutenance ou un entretien technique.
+En résumé : Terraform apporte la dimension DevOps sans surcharger le planning avec un second outil, tandis que la configuration de la VM reste manuelle pour garder le contrôle et bien comprendre chaque commande exécutée.
 
 ## 3. Architecture
 
