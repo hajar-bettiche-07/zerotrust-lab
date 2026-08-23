@@ -14,7 +14,6 @@ Construire une VM Linux sur Azure et la sécuriser étape par étape, jusqu'à c
 
 | Décision | Choix retenu | Justification |
 |---|---|---|
-| Provider Cloud | Azure | Cohérent avec la préparation AZ-104 ; compte étudiant actif (100$ de crédit) |
 | Outil DevOps | Terraform seul (pas Ansible) | Meilleur ratio effort/valeur dans le temps imparti ; l'IaC est la compétence la plus demandée ; transférable AWS/GCP ; permet de détruire/recréer l'infra facilement pour économiser le crédit |
 | Configuration VM | Manuelle (SSH, UFW, WireGuard, Fail2Ban) | Évite de cumuler deux courbes d'apprentissage (Terraform + Ansible). Ansible reste une amélioration future documentée plus bas |
 | Taille VM | `Standard_B1s` | Éligible aux offres légères Azure, suffisant pour ce lab, limite la consommation du crédit étudiant |
