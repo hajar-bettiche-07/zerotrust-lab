@@ -43,7 +43,7 @@ En résumé : Terraform apporte la dimension DevOps sans surcharger le planning 
 Chaque couche (NSG, UFW, VPN, SSH, Fail2Ban) filtre ou surveille le trafic indépendamment des autres, de sorte qu'une seule couche compromise ne suffit pas à obtenir l'accès.
 
 <p align="center">
-  <img src="screenshots/architecture-schema.png" width="650" alt="Schéma d'architecture Zero Trust">
+  <img src="screenshots/architecture-schema.png" width="500" alt="Schéma d'architecture Zero Trust">
 </p>
 
 **Description du flux :**
