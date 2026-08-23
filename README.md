@@ -6,6 +6,21 @@ Projet réalisé seule, en combinant délibérément quatre axes : **Cloud** (Az
 
 ---
 
+## Sommaire
+
+1. [Objectif du projet](#1-objectif-du-projet)
+2. [Choix retenus et justificatifs](#2-choix-retenus-et-justificatifs)
+3. [Architecture](#3-architecture)
+4. [Stack technique](#4-stack-technique)
+5. [Déroulé du projet, étape par étape](#5-déroulé-du-projet-étape-par-étape)
+6. [Difficultés rencontrées et solutions apportées](#6-difficultés-rencontrées-et-solutions-apportées)
+7. [Principes de sécurité appliqués](#7-principes-de-sécurité-appliqués)
+8. [Reproduire l'infrastructure](#8-reproduire-linfrastructure)
+9. [Améliorations futures](#9-améliorations-futures)
+10. [Structure du repository](#10-structure-du-repository)
+
+---
+
 ## 1. Objectif du projet
 
 Construire une VM Linux sur Azure et la sécuriser étape par étape, jusqu'à ce que l'accès distant ne soit possible **que** via un VPN chiffré — jamais en direct. Au-delà de l'aspect technique, l'objectif était de produire un portfolio cohérent avec un profil Network + Cloud + DevOps + Security, en vue de la certification AZ-104 et d'entretiens techniques.
@@ -14,7 +29,6 @@ Construire une VM Linux sur Azure et la sécuriser étape par étape, jusqu'à c
 
 | Décision | Choix retenu | Justification |
 |---|---|---|
-| Provider Cloud | Azure | Cohérent avec la préparation AZ-104 ; compte étudiant actif (100$ de crédit) |
 | Outil DevOps | Terraform seul (pas Ansible) | Meilleur ratio effort/valeur dans le temps imparti ; l'IaC est la compétence la plus demandée ; transférable AWS/GCP ; permet de détruire/recréer l'infra facilement pour économiser le crédit |
 | Configuration VM | Manuelle (SSH, UFW, WireGuard, Fail2Ban) | Évite de cumuler deux courbes d'apprentissage (Terraform + Ansible). Ansible reste une amélioration future documentée plus bas |
 | Taille VM | `Standard_B1s` | Éligible aux offres légères Azure, suffisant pour ce lab, limite la consommation du crédit étudiant |
@@ -28,7 +42,9 @@ En résumé : Terraform apporte la dimension DevOps sans surcharger le planning 
 
 Chaque couche (NSG, UFW, VPN, SSH, Fail2Ban) filtre ou surveille le trafic indépendamment des autres, de sorte qu'une seule couche compromise ne suffit pas à obtenir l'accès.
 
-![Schéma d'architecture Zero Trust](screenshots/architecture-schema.png)
+<p align="center">
+  <img src="screenshots/architecture-schema.png" width="650" alt="Schéma d'architecture Zero Trust">
+</p>
 
 **Description du flux :**
 - Le PC client se connecte via un tunnel WireGuard chiffré vers la VM Azure — c'est le seul chemin d'accès autorisé.
@@ -52,56 +68,63 @@ L'ensemble de l'infrastructure Azure (Resource Group, VNet, Subnet, NSG, VM) est
 
 ## 5. Déroulé du projet, étape par étape
 
-### Étape 1 — Infrastructure Azure via Terraform
+<details>
+<summary><strong>Étape 1 — Infrastructure Azure via Terraform</strong> (cliquer pour déplier)</summary>
 
 Setup du projet (`zerotrust-lab/`, repo Git, `.gitignore` excluant `.terraform/`, `*.tfstate`, `terraform.tfvars`), puis écriture du code Terraform bloc par bloc, avec un commit à chaque étape : provider `azurerm`, Resource Group `rg-zerotrust-lab`, VNet (`10.0.0.0/16`) + Subnet (`10.0.1.0/24`), NSG avec règle SSH restreinte à mon IP, IP publique statique, interface réseau, VM Linux `Standard_B1s` (Ubuntu 22.04) en authentification par clé SSH uniquement.
 
 **Automatisation clé** : ajout d'une data source `http` (provider `hashicorp/http`) interrogeant `api.ipify.org` pour récupérer dynamiquement mon IP publique à chaque `terraform plan`/`apply`, afin d'éviter de mettre à jour `terraform.tfvars` manuellement à chaque changement d'IP.
 
 Règle NSG avec IP dynamique (`data.http.my_ip`) :
-![NSG dynamique](screenshots/etape1-terraform/main-tf-nsg-dynamic-ip-rule.jpg)
+<p align="center"><img src="screenshots/etape1-terraform/main-tf-nsg-dynamic-ip-rule.jpg" width="700" alt="NSG dynamique"></p>
 
 `terraform plan` recalculant l'IP autorisée :
-![terraform plan](screenshots/etape1-terraform/terraform-plan-ip-change-diff.jpg)
+<p align="center"><img src="screenshots/etape1-terraform/terraform-plan-ip-change-diff.jpg" width="700" alt="terraform plan"></p>
 
 `terraform apply` réussi :
-![terraform apply](screenshots/etape1-terraform/terraform-apply-success.jpg)
+<p align="center"><img src="screenshots/etape1-terraform/terraform-apply-success.jpg" width="700" alt="terraform apply"></p>
 
 `outputs.tf` — IP publique de la VM :
-![outputs.tf](screenshots/etape1-terraform/outputs-tf-vm-public-ip.jpg)
+<p align="center"><img src="screenshots/etape1-terraform/outputs-tf-vm-public-ip.jpg" width="700" alt="outputs.tf"></p>
 
 Connexion SSH refusée sans la bonne clé :
-![SSH refusé](screenshots/etape1-terraform/ssh-permission-denied-no-key.jpg)
+<p align="center"><img src="screenshots/etape1-terraform/ssh-permission-denied-no-key.jpg" width="700" alt="SSH refusé"></p>
 
 Commits atomiques et push :
-![git commit](screenshots/etape1-terraform/git-commit-push.jpg)
+<p align="center"><img src="screenshots/etape1-terraform/git-commit-push.jpg" width="700" alt="git commit"></p>
 
 **Résultat** : déploiement réussi (`8 resources added`), connexion SSH validée depuis PowerShell.
 
-### Étape 2 — SSH Hardening + Fail2Ban
+</details>
+
+<details>
+<summary><strong>Étape 2 — SSH Hardening + Fail2Ban</strong> (cliquer pour déplier)</summary>
 
 Lecture attentive de `/etc/ssh/sshd_config` avec une distinction cruciale : une ligne commentée (`#`) représente une **valeur par défaut appliquée**, pas une option désactivée. Vérification qu'Azure désactive déjà `PasswordAuthentication` par défaut (via `admin_ssh_key`), puis ajout explicite de `PasswordAuthentication no` en défense en profondeur, et de `PermitRootLogin no` (plus strict que la valeur par défaut `prohibit-password`). Installation et activation de Fail2Ban.
 
 **Méthodologie systématique** : test de connexion avant modification → modification → redémarrage du service → test après, dans un nouveau terminal, sans jamais fermer la session active, pour ne jamais risquer un verrouillage complet.
 
 `sshd_config` — lignes commentées, valeurs par défaut appliquées :
-![sshd_config](screenshots/etape2-ssh-hardening/sshd-config-defaults-commented.jpg)
+<p align="center"><img src="screenshots/etape2-ssh-hardening/sshd-config-defaults-commented.jpg" width="700" alt="sshd_config"></p>
 
 `PermitRootLogin` encore à sa valeur par défaut avant durcissement :
-![PermitRootLogin](screenshots/etape2-ssh-hardening/sshd-config-permitrootlogin-default.jpg)
+<p align="center"><img src="screenshots/etape2-ssh-hardening/sshd-config-permitrootlogin-default.jpg" width="700" alt="PermitRootLogin"></p>
 
 `PasswordAuthentication no` confirmé :
-![PasswordAuthentication no](screenshots/etape2-ssh-hardening/password-authentication-no-confirmed.png)
+<p align="center"><img src="screenshots/etape2-ssh-hardening/password-authentication-no-confirmed.png" width="700" alt="PasswordAuthentication no"></p>
 
 Installation de Fail2Ban — erreur avant `apt update` :
-![install error](screenshots/etape2-ssh-hardening/fail2ban-install-error-before-update.jpg)
+<p align="center"><img src="screenshots/etape2-ssh-hardening/fail2ban-install-error-before-update.jpg" width="700" alt="install error"></p>
 
 Fail2Ban activé et rendu persistant au reboot :
-![fail2ban enable](screenshots/etape2-ssh-hardening/fail2ban-enable-persistent.jpg)
+<p align="center"><img src="screenshots/etape2-ssh-hardening/fail2ban-enable-persistent.jpg" width="700" alt="fail2ban enable"></p>
 
 **Principes illustrés** : défense en profondeur, least privilege, fail-safe avant modification, deny by default.
 
-### Étape 3 — UFW (pare-feu local) et incident majeur
+</details>
+
+<details>
+<summary><strong>Étape 3 — UFW (pare-feu local) et incident majeur</strong> (cliquer pour déplier)</summary>
 
 Vérification de l'état initial (`inactive`), puis respect de l'ordre critique `ufw allow 22` **avant** `ufw enable` pour éviter un auto-blocage. Découverte que la règle par défaut autorisait `Anywhere` et non uniquement mon IP ; restriction appliquée, anciennes règles supprimées.
 
@@ -112,64 +135,73 @@ Vérification de l'état initial (`inactive`), puis respect de l'ordre critique 
 **Décision architecturale qui en découle** : plutôt que d'automatiser aussi UFW (script cron ou bash envisagés), j'ai choisi de laisser UFW ouvert sur le port SSH sans restriction d'IP, et de m'appuyer uniquement sur le NSG — déjà automatisé — comme seule couche de filtrage par adresse IP. C'est un compromis assumé : perte partielle de la défense en profondeur sur ce point précis, au bénéfice d'une infrastructure plus simple à maintenir sans intervention manuelle répétée à chaque changement de réseau.
 
 UFW inactif par défaut (`deny incoming`) :
-![ufw verbose](screenshots/etape3-ufw-incident/ufw-status-verbose-deny-default.jpg)
+<p align="center"><img src="screenshots/etape3-ufw-incident/ufw-status-verbose-deny-default.jpg" width="700" alt="ufw verbose"></p>
 
 `allow 22` avant `enable` :
-![ufw allow before enable](screenshots/etape3-ufw-incident/ufw-allow-before-enable.jpg)
+<p align="center"><img src="screenshots/etape3-ufw-incident/ufw-allow-before-enable.jpg" width="700" alt="ufw allow before enable"></p>
 
 Restriction à mon IP personnelle :
-![ufw restricted](screenshots/etape3-ufw-incident/ufw-restricted-to-my-ip.jpg)
+<p align="center"><img src="screenshots/etape3-ufw-incident/ufw-restricted-to-my-ip.jpg" width="700" alt="ufw restricted"></p>
 
 Suppression des anciennes règles :
-![ufw delete rule](screenshots/etape3-ufw-incident/ufw-delete-old-rule.jpg)
+<p align="center"><img src="screenshots/etape3-ufw-incident/ufw-delete-old-rule.jpg" width="700" alt="ufw delete rule"></p>
 
 Récupération via la Azure Serial Console :
-![serial console](screenshots/etape3-ufw-incident/azure-serial-console-recovery.jpg)
+<p align="center"><img src="screenshots/etape3-ufw-incident/azure-serial-console-recovery.jpg" width="700" alt="serial console"></p>
 
-### Étape 4 — WireGuard VPN
+</details>
+
+<details>
+<summary><strong>Étape 4 — WireGuard VPN</strong> (cliquer pour déplier)</summary>
 
 Installation de WireGuard, génération de deux paires de clés distinctes (serveur et client) avec permissions restreintes (`chmod 600` sur les clés privées). Clés client générées via l'application WireGuard officielle (Windows). Configuration de l'interface serveur (`wg0.conf` : IP interne VPN, port d'écoute, peer autorisé), configuration du client, ouverture du port UDP 51820 dans le NSG et UFW, puis test réussi du tunnel.
 
 **Point pédagogique clé** : contrairement au NSG/UFW qui filtrent par IP (vulnérables aux IP dynamiques), WireGuard authentifie par **identité cryptographique** (clé publique) — un changement d'IP côté client n'a aucune incidence sur l'accès VPN.
 
 Génération des clés serveur (`wg genkey`) :
-![wg genkey](screenshots/etape4-wireguard/wg-genkey-server-keys.jpg)
+<p align="center"><img src="screenshots/etape4-wireguard/wg-genkey-server-keys.jpg" width="700" alt="wg genkey"></p>
 
 Configuration serveur `wg0.conf` :
-![wg0.conf](screenshots/etape4-wireguard/wg0-conf-server-config.jpg)
+<p align="center"><img src="screenshots/etape4-wireguard/wg0-conf-server-config.jpg" width="700" alt="wg0.conf"></p>
 
 `wg-quick up wg0` :
-![wg-quick up](screenshots/etape4-wireguard/wg-quick-up-wg0.jpg)
+<p align="center"><img src="screenshots/etape4-wireguard/wg-quick-up-wg0.jpg" width="700" alt="wg-quick up"></p>
 
 `wg show` — interface et peer actifs :
-![wg show](screenshots/etape4-wireguard/wg-show-server-peer.jpg)
+<p align="center"><img src="screenshots/etape4-wireguard/wg-show-server-peer.jpg" width="700" alt="wg show"></p>
 
 Application WireGuard côté client, tunnel actif :
-![client WireGuard](screenshots/etape4-wireguard/wireguard-client-app-tunnel.jpg)
+<p align="center"><img src="screenshots/etape4-wireguard/wireguard-client-app-tunnel.jpg" width="500" alt="client WireGuard"></p>
 
 Test du tunnel (ping réussi) :
-![ping tunnel](screenshots/etape4-wireguard/ping-tunnel-success.jpg)
+<p align="center"><img src="screenshots/etape4-wireguard/ping-tunnel-success.jpg" width="700" alt="ping tunnel"></p>
 
 Persistance au reboot (`systemctl enable`) :
-![systemctl enable](screenshots/etape4-wireguard/systemctl-enable-wg-quick.jpg)
+<p align="center"><img src="screenshots/etape4-wireguard/systemctl-enable-wg-quick.jpg" width="700" alt="systemctl enable"></p>
 
-### Étape 5 — Zero Trust : bascule SSH via VPN uniquement
+</details>
+
+<details>
+<summary><strong>Étape 5 — Zero Trust : bascule SSH via VPN uniquement</strong> (cliquer pour déplier)</summary>
 
 Modification du NSG (règle `Allow-WireGuard`, UDP 51820) et d'UFW (SSH restreint au sous-réseau interne du VPN, `10.8.0.0/24`) pour bloquer tout accès SSH direct depuis Internet. Tests des deux scénarios : accès direct refusé, accès via VPN accepté.
 
 Règle NSG `Allow-WireGuard` (UDP 51820) :
-![NSG WireGuard](screenshots/etape5-zero-trust/nsg-allow-wireguard-rule.jpg)
+<p align="center"><img src="screenshots/etape5-zero-trust/nsg-allow-wireguard-rule.jpg" width="700" alt="NSG WireGuard"></p>
 
 UFW — SSH restreint au sous-réseau VPN :
-![UFW restreint VPN](screenshots/etape5-zero-trust/ufw-ssh-restricted-vpn-subnet.jpg)
+<p align="center"><img src="screenshots/etape5-zero-trust/ufw-ssh-restricted-vpn-subnet.jpg" width="700" alt="UFW restreint VPN"></p>
 
 SSH direct → `Connection timed out` :
-![SSH direct timeout](screenshots/etape5-zero-trust/ssh-direct-timeout-alone.jpg)
+<p align="center"><img src="screenshots/etape5-zero-trust/ssh-direct-timeout-alone.jpg" width="700" alt="SSH direct timeout"></p>
 
 **Preuve Zero Trust** : accès direct refusé, accès via VPN (`10.8.0.1`) accepté :
-![Zero Trust proof](screenshots/etape5-zero-trust/ssh-direct-refused-vpn-accepted.jpg)
+<p align="center"><img src="screenshots/etape5-zero-trust/ssh-direct-refused-vpn-accepted.jpg" width="700" alt="Zero Trust proof"></p>
 
-### Étape 6 — Fail2Ban avancé (test réel) et auto-bannissement
+</details>
+
+<details>
+<summary><strong>Étape 6 — Fail2Ban avancé (test réel) et auto-bannissement</strong> (cliquer pour déplier)</summary>
 
 Création d'une jail SSH personnalisée (`jail.local` : `maxretry 3`, `bantime 600s`). Test réel : simulation de tentatives de connexion échouées avec un faux utilisateur, depuis mon propre poste — le seul peer VPN configuré à ce moment. Après la 3ᵉ tentative, mon IP a été automatiquement bannie, coupant **à la fois** les nouvelles tentatives et ma session déjà active — ce que je n'avais pas anticipé.
 
@@ -180,38 +212,43 @@ Création d'une jail SSH personnalisée (`jail.local` : `maxretry 3`, `bantime 6
 **Leçon retenue** : un vrai filet de sécurité pour ce type de test doit être préparé **avant** la manipulation (accès console vérifié, mot de passe temporaire prêt), pas découvert dans l'urgence après coup.
 
 `jail.local` — configuration personnalisée :
-![jail.local](screenshots/etape6-fail2ban-avance/jail-local-config.jpg)
+<p align="center"><img src="screenshots/etape6-fail2ban-avance/jail-local-config.jpg" width="700" alt="jail.local"></p>
 
 Fail2Ban actif :
-![fail2ban active](screenshots/etape6-fail2ban-avance/fail2ban-service-active.png)
+<p align="center"><img src="screenshots/etape6-fail2ban-avance/fail2ban-service-active.png" width="700" alt="fail2ban active"></p>
 
 Test déclencheur : 3 échecs puis `Connection timed out` :
-![fail2ban trigger](screenshots/etape6-fail2ban-avance/fail2ban-test-triggering-ban.png)
+<p align="center"><img src="screenshots/etape6-fail2ban-avance/fail2ban-test-triggering-ban.png" width="700" alt="fail2ban trigger"></p>
 
 `Total banned: 1` après le test :
-![total banned](screenshots/etape6-fail2ban-avance/fail2ban-status-total-banned-1.png)
+<p align="center"><img src="screenshots/etape6-fail2ban-avance/fail2ban-status-total-banned-1.png" width="700" alt="total banned"></p>
 
 IP bannie visible, puis commande `unban` :
-![banned ip + unban](screenshots/etape6-fail2ban-avance/fail2ban-banned-ip-and-unban-command.png)
+<p align="center"><img src="screenshots/etape6-fail2ban-avance/fail2ban-banned-ip-and-unban-command.png" width="700" alt="banned ip + unban"></p>
 
 Statut après débannissement :
-![after unban](screenshots/etape6-fail2ban-avance/fail2ban-status-after-unban.png)
+<p align="center"><img src="screenshots/etape6-fail2ban-avance/fail2ban-status-after-unban.png" width="700" alt="after unban"></p>
 
 Régression détectée : `PasswordAuthentication yes` :
-![régression](screenshots/etape6-fail2ban-avance/password-authentication-regression.jpg)
+<p align="center"><img src="screenshots/etape6-fail2ban-avance/password-authentication-regression.jpg" width="700" alt="régression"></p>
 
 Régression corrigée, retour à `no` :
-![corrigé](screenshots/etape6-fail2ban-avance/password-authentication-fixed.png)
+<p align="center"><img src="screenshots/etape6-fail2ban-avance/password-authentication-fixed.png" width="700" alt="corrigé"></p>
 
-### Étape 7 — Finalisation
+</details>
+
+<details>
+<summary><strong>Étape 7 — Finalisation</strong> (cliquer pour déplier)</summary>
 
 Nettoyage du code Terraform : suppression de la variable `my_ip` et de la data source `http`, devenues obsolètes depuis que SSH ne passe plus que par le VPN. Vérification finale du `.gitignore`, commit et push, puis `terraform destroy` pour libérer entièrement les ressources Azure.
 
 `git status` propre après nettoyage :
-![git status clean](screenshots/etape7-finalisation/git-status-clean.jpg)
+<p align="center"><img src="screenshots/etape7-finalisation/git-status-clean.jpg" width="700" alt="git status clean"></p>
 
 Commit du fichier de lock Terraform :
-![git commit lock](screenshots/etape7-finalisation/git-commit-lock-file.jpg)
+<p align="center"><img src="screenshots/etape7-finalisation/git-commit-lock-file.jpg" width="700" alt="git commit lock"></p>
+
+</details>
 
 ---
 
