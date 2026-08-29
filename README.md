@@ -1,4 +1,4 @@
-# azure-secure-remote-access
+# Azure-Zero Trust Network Access Lab
 
 Applying Zero-Trust principles to secure remote administration of an Azure VM.
 
