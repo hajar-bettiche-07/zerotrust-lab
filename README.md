@@ -29,7 +29,7 @@ Internet
                      UFW ──► sshd
 ```
 
-![architecture](screenshots/arch.svg)
+![architecture](screenshots/arch.png)
 
 - **NSG**: UDP 51820 allow, TCP 22 deny, deny inbound otherwise. SSH has no public route.
 - **UFW**: 22 allowed only from `10.8.0.0/24`, deny inbound otherwise.
